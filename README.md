@@ -4,7 +4,7 @@
 
 ITALIC is a benchmark evaluating language models' understanding of Italian culture, commonsense reasoning and linguistic proficiency in a morphologically rich language.
 
-<center><img src="./examples.png" width="350" /></center>
+<center><img src="./img/examples.png" width="350" /></center>
 
 Above are example questions from *ITALIC*. **Note**: every example is a direct translation; the original questions
 are in Italian. The correct option is marked by (✓).
@@ -69,7 +69,7 @@ The initial data was sourced from various files in PDF, HTML, DOC, and other for
 
 Please consult the full paper for a detailed description of our curation process.
 
-<center><img src="./workflow.svg" width="350" height="350" /></center>
+<center><img src="./img/workflow.svg" width="350" height="350" /></center>
 
 #### Who are the source data producers?
 
