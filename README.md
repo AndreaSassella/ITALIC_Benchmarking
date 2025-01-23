@@ -45,10 +45,12 @@ Each question is formatted as a multiple-choice query, with an average question 
 The longest question is 577 characters long. The minimum number of choices per question is 2, while the maximum is 5. 
 The total number of tokens across the input data amounts to 499,963.
 
-
 | Column                 | Data Type     | Description                                                                 |
 | ---------------------- | ------------- | --------------------------------------------------------------------------- |
-| `Categorisation Structure` | [String]   | Hierarchical categorisation of major, minor, and subcategories for each question |
+| `question` | [String]   | The actual content of the question |
+| `options` | [List]   | The options to choose from. Only one is correct |
+| `answer` | [String]   | The correct answer out of the options |
+| `category` | [String]   | The dedicated cultural section of the question |
 
 ## Dataset Creation
 
