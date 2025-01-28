@@ -1,0 +1,11 @@
+hydra-core
+numpy
+pandas
+tenacity
+loguru
+omegaconf
+pydantic
+tqdm
+openai
+anthropic
+google-generativeai
