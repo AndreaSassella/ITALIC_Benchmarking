@@ -53,6 +53,7 @@ The total number of tokens across the input data amounts to 499,963.
 | `options` | [List]   | The options to choose from. Only one is correct |
 | `answer` | [String]   | The correct answer out of the options |
 | `category` | [String]   | The dedicated cultural section of the question |
+| `macro_category` | [String]   | The macro category of the question |
 
 ## Dataset Creation
 
