@@ -35,7 +35,7 @@ It serves as a benchmark for evaluating existing models and as a roadmap for fut
 <!-- Provide the basic links for the dataset. -->
 
 - **Huggingface:** https://huggingface.co/datasets/Crisp-Unimib/ITALIC
-- **Zenodo** [ADD THIS LATER]
+- **Zenodo** https://doi.org/10.5281/zenodo.14725822
 - **Paper:** [ACCEPTED AT NAACL25]
 
 ## Dataset Structure
