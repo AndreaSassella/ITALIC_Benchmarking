@@ -28,6 +28,39 @@ It serves as a benchmark for evaluating existing models and as a roadmap for fut
 - **Language(s) (NLP):** Italian
 - **License:** MIT
 
+### How to Use
+First, clone the ITALIC repository to your local machine:  
+
+```bash
+git clone https://github.com/Crisp-Unimib/ITALIC.git
+cd ITALIC
+```
+
+To avoid conflicts with system packages, it's recommended to use a virtual environment:
+
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+```
+
+ITALIC requires vLLM for serving models. Install it with:
+
+```bash
+pip install vllm[all]
+```
+
+Run the vLLM server with your preferred model. Here’s an example using meta-llama/Llama-3.3-70B-Instruct:
+
+```bash
+vllm serve meta-llama/Llama-3.3-70B-Instruct
+```
+
+Once the vLLM server is running, you can tweak setting in config.yaml, such as model name, API endpoint, temperature, max tokens.
+You can then execute the evaluation script:
+
+```bash
+python eval.py
+```
 
 
 ### Dataset Sources
