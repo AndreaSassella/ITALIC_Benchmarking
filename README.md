@@ -1,4 +1,4 @@
-# Dataset Card for ITALIC
+![image](https://github.com/user-attachments/assets/28291f12-6efd-4944-9948-83681c38632c)# Dataset Card for ITALIC
 
 <!-- Provide a quick summary of the dataset. -->
 
@@ -69,7 +69,7 @@ python eval.py
 
 - **Huggingface:** https://huggingface.co/datasets/Crisp-Unimib/ITALIC
 - **Zenodo** https://doi.org/10.5281/zenodo.14725822
-- **Paper:** [ACCEPTED AT NAACL25]
+- **Paper:** [Full Paper Available at ACL Anthology](https://aclanthology.org/2025.naacl-long.68.pdf)
 
 ## Dataset Structure
 
