@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/28291f12-6efd-4944-9948-83681c38632c)# Dataset Card for ITALIC
+# Dataset Card for ITALIC
 
 <!-- Provide a quick summary of the dataset. -->
 
