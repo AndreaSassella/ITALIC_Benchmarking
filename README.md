@@ -63,6 +63,8 @@ You can then execute the evaluation script:
 python eval.py
 ```
 
+The evaluation runs at few-shot by default. If you want to evaluate your models in a zero-shot setting, please comment the *few_shot_file* line in the config.yaml file.
+
 ### Dataset Sources
 
 <!-- Provide the basic links for the dataset. -->
