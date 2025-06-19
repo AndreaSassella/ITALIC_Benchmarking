@@ -60,7 +60,7 @@ Once the vLLM server is running, you can tweak setting in config.yaml, such as m
 You can then execute the evaluation script:
 
 ```bash
-python eval.py
+python run_eval.py
 ```
 
 The evaluation runs at few-shot by default. If you want to evaluate your models in a zero-shot setting, please set the _few_shot_file_ line as _None_ in the config.yaml file.
