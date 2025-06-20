@@ -19,7 +19,7 @@ fast: true # use CoT or not
 
 data:
   data_file: ./italic.jsonl
-  few_shot_file: ./5_shots.jsonl # Set as None to run zero-shot evaluation
+  few_shot_file: ./5_shots.jsonl # Set as null to run zero-shot evaluation
   output_dir: results
 
 num_threads: 30
