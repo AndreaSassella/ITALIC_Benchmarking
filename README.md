@@ -70,6 +70,7 @@ The evaluation runs at few-shot by default. If you want to evaluate your models 
 <!-- Provide the basic links for the dataset. -->
 
 - **Huggingface:** https://huggingface.co/datasets/Crisp-Unimib/ITALIC
+- **Leaderboard:** https://huggingface.co/spaces/Crisp-Unimib/ITALIC-Leaderboard
 - **Zenodo** https://doi.org/10.5281/zenodo.14725822
 - **Paper:** [Full Paper Available at ACL Anthology](https://aclanthology.org/2025.naacl-long.68.pdf)
 
