@@ -1,8 +1,24 @@
-provider: custom_openai # one of [openai, custom_openai, google, anthropic]
-model: mii-llm/maestrale-chat-0.4-beta
-api_key: EMPTY # default vllm key
+models:
+  - provider: vllm
+    model: Qwen/Qwen2-VL-2B-Instruct
+    api_key:  ${HF_TOKEN}# AS HF key
+  - provider: vllm
+    model: HuggingFaceTB/SmolLM2-135M-Instruct
+    api_key:  ${HF_TOKEN}# AS HF key
+  - provider: vllm
+    model: Qwen/Qwen2.5-0.5B
+    api_key:  ${HF_TOKEN}# AS HF key
+  - provider: vllm
+    model: ICTNLP/LLaMA-Omni2-0.5B
+    api_key: ${HF_TOKEN}
+  - provider: vllm
+    model: turboderp/Qwama-0.5B-Instruct
+    api_key: ${HF_TOKEN}
+  - provider: vllm
+    model: tencent/Hunyuan-0.5B-Instruct
+    api_key: ${HF_TOKEN}
 temperature: 0.0
-max_tokens: 350
+max_tokens: 10
 
 system_message: # set a custom system message
 
@@ -12,7 +28,7 @@ provider_kwargs:
 
 rate_limiting:
   enabled: false
-  requests_per_minute: 15
+  requests_per_minute: 10
 
 limit: # limit to n examples
 fast: true # use CoT or not
@@ -22,7 +38,7 @@ data:
   few_shot_file: ./5_shots.jsonl # Set as null to run zero-shot evaluation
   output_dir: results
 
-num_threads: 30
+num_threads: 10
 
 auto_resume: true # resume from last checkpoint
 
