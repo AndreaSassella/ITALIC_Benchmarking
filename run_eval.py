@@ -15,9 +15,13 @@ import numpy as np
 import pandas as pd
 import tenacity
 from loguru import logger
-from omegaconf import DictConfig
+from omegaconf import DictConfig, open_dict
 from pydantic import BaseModel
 from tqdm import tqdm
+import torch, gc
+import torch, gc
+
+
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logger.opt(colors=True)
@@ -48,7 +52,7 @@ class ProviderEnum(str, Enum):
     OPENAI = "openai"
     GOOGLE = "google"
     CUSTOM_OPENAI = "custom_openai"
-
+    VLLM = "vllm"
 
 class Sample(BaseModel):
     messages: List[Dict[str, str]]
@@ -209,9 +213,11 @@ def model_factory(provider: ProviderEnum, api_key: str, **kwargs) -> BaseProvide
             return GoogleProvider(api_key=api_key)
         case ProviderEnum.CUSTOM_OPENAI:
             return OpenAIProvider(api_key=api_key, **kwargs)
+        case ProviderEnum.VLLM:
+            model = kwargs.pop("model")
+            return VLLMProvider(model=model, **kwargs)
         case _:
             raise ValueError(f"Provider {provider} not supported.")
-
 
 class Provider(BaseProvider):
     def __init__(self, api_key: str, provider: ProviderEnum, **kwargs):
@@ -319,6 +325,11 @@ def load_few_shots(file_path: str) -> List[Dict[str, Any]]:
 
 
 def extract_answer_fast(output: str) -> str:
+    # First try: ASSISTANT: X
+    match = re.search(r"ASSISTANT:\s*([A-Z])", output)
+    if match:
+        return match.group(1)
+
     LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     min_index = min(
         [output.find(letter) for letter in LETTERS if letter in output], default=-1
@@ -329,6 +340,11 @@ def extract_answer_fast(output: str) -> str:
 
 
 def extract_answer(output: str) -> str:
+    # First try: ASSISTANT: X
+    match = re.search(r"ASSISTANT:\s*([A-Z])", output)
+    if match:
+        return match.group(1)
+
     def _find(pattern: str, text: str, ignore_case: bool = True) -> str:
         flags = re.DOTALL | (re.IGNORECASE if ignore_case else 0)
         match = re.search(pattern, text, flags)
@@ -390,7 +406,7 @@ def aggregate_results(
 
     for resp in responses:
         predicted_answer = (
-            extract_answer(resp.output)
+            extract_answer_fast(resp.output)
             if not resp.fast
             else extract_answer_fast(resp.output)
         )
@@ -435,80 +451,76 @@ def load_intermediate_results(
 def process(
     requests: List[ChatCompletionRequest], client: Provider, config: DictConfig
 ):
+
     if config.limit:
         requests = requests[: config.limit]
 
     Path(config.data.output_dir).mkdir(parents=True, exist_ok=True)
+
     dataset_name = Path(config.data.data_file).stem
+
     clean_model = (
         lambda x: x.replace("/", "_")
         .replace(" ", "_")
         .replace("-", "_")
         .replace(":", "_")
     )
-    if config.fast:
-        dataset_name += "_fast"
-
-    if config.data.few_shot_file:
-        dataset_name += "_few_shot"
 
     output_file = (
         Path(config.data.output_dir)
         / f"{config.provider}_{clean_model(config.model)}_{dataset_name}.json"
     )
-    checkpoint_file = (
-        Path(config.data.output_dir)
-        / f"{config.provider}_{clean_model(config.model)}_{dataset_name}_checkpoint.json"
+
+    logger.info(
+        f"\n\nmodel: {config.model}\nthreads: {config.num_threads}\nfile: {config.data.data_file}\n"
     )
 
-    rate_limiter = None
-    if config.rate_limiting.enabled:
-        logger.info("Rate limiting enabled.")
-        rate_limiter = RateLimiter(config.rate_limiting.requests_per_minute)
+    all_responses = []
 
-    all_responses, processed_ids = [], set()
-    if config.checkpointing.enabled and config.auto_resume:
-        previous_results, processed_ids = load_intermediate_results(checkpoint_file)
-        all_responses.extend(previous_results)
+    # -------------------------
+    # FAST PATH FOR VLLM
+    # -------------------------
+    if config.provider == "vllm":
 
-    remaining_requests = [req for req in requests if req.index not in processed_ids]
-    if not remaining_requests:
-        logger.info("<red>All requests have been processed in previous runs.</red>")
-        return
+        logger.info("Using vLLM batched inference")
 
-    log_str = (
-        f"\n\n<blue>model:</blue> <yellow>{config.model}</yellow>\n"
-        f"<blue>cot:</blue> <yellow>{not config.fast}</yellow>\n"
-        f"<blue>file:</blue> <yellow>{config.data.data_file}</yellow>\n"
-        f"<blue>n. threads:</blue> <yellow>{config.num_threads}</yellow>\n"
-        f"<blue>checkpointing enabled:</blue> <yellow>{config.checkpointing.enabled}</yellow>\n\n"
-    )
-    logger.info(log_str)
+        outputs = client.provider.batch_complete(
+            requests,
+            config.temperature,
+            config.max_tokens,
+        )
 
-    counter = 0
-    pbar = tqdm(total=len(remaining_requests), desc="Processing responses")
-    with ThreadPoolExecutor(
-        max_workers=min(config.num_threads, len(remaining_requests))
-    ) as executor:
-        futures = [
-            executor.submit(process_request, req, client, rate_limiter)
-            for req in remaining_requests
-        ]
-        for future in as_completed(futures):
-            resp = future.result()
+        for req, text in zip(requests, outputs):
+            resp = ChatCompletionResponse(**req.dict(), output=text)
             all_responses.append(resp)
-            pbar.update(1)
-            counter += 1
 
-            if (
-                config.checkpointing.checkpoint_interval
-                and counter % config.checkpointing.checkpoint_interval == 0
-            ):
-                save_intermediate_results(all_responses, checkpoint_file)
-                ckpt_metrics = aggregate_results(all_responses)
-                pbar.set_postfix(ckpt_metrics)
+    # -------------------------
+    # NORMAL PATH (API MODELS)
+    # -------------------------
+    else:
+
+        rate_limiter = None
+        if config.rate_limiting.enabled:
+            rate_limiter = RateLimiter(config.rate_limiting.requests_per_minute)
+
+        pbar = tqdm(total=len(requests), desc="Processing responses")
+
+        with ThreadPoolExecutor(
+            max_workers=min(config.num_threads, len(requests))
+        ) as executor:
+
+            futures = [
+                executor.submit(process_request, req, client, rate_limiter)
+                for req in requests
+            ]
+
+            for future in as_completed(futures):
+                resp = future.result()
+                all_responses.append(resp)
+                pbar.update(1)
 
     metrics = aggregate_results(all_responses)
+
     logger.info(f"Metrics: {metrics}")
 
     results = [resp.dict() for resp in sorted(all_responses, key=lambda x: x.index)]
@@ -551,19 +563,96 @@ def load_requests(config: DictConfig) -> List[ChatCompletionRequest]:
         )
     return requests
 
+class VLLMProvider(BaseProvider):
+    def __init__(self, model: str, **kwargs):
+        from vllm import LLM
 
-@hydra.main(version_base=None, config_path="./")
+        self.model_name = model
+        self.llm = LLM(
+            model=model,
+            gpu_memory_utilization=0.8,
+            trust_remote_code=True,
+            **kwargs,
+        )
+
+    # This is required by the abstract base class
+    def complete(
+        self,
+        model: str,
+        messages: list,
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
+        # Wrap single request in batch_complete
+        from types import SimpleNamespace
+        dummy_req = SimpleNamespace(messages=messages)
+        # batch_complete expects a list of ChatCompletionRequest objects
+        # we can wrap a minimal object for compatibility
+        class DummyRequest:
+            def __init__(self, messages):
+                self.messages = messages
+        out = self.batch_complete([DummyRequest(messages)], temperature, max_tokens)
+        return out[0]
+
+    def batch_complete(
+        self,
+        requests: list,
+        temperature: float,
+        max_tokens: int,
+    ) -> list:
+
+        from vllm import SamplingParams
+
+        prompts = []
+        for req in requests:
+            prompt = ""
+            for m in req.messages:
+                prompt += f"{m['role'].upper()}: {m['content']}\n"
+            prompts.append(prompt)
+
+        sampling_params = SamplingParams(
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+        outputs = self.llm.generate(prompts, sampling_params)
+
+        return [o.outputs[0].text.strip() for o in outputs]
+
+@hydra.main(version_base=None, config_path="./", config_name="config")
 def run(config: DictConfig):
-    logger.info("<bold>🔎 | Running evaluation | 🔎</bold>")
-    client = Provider(
-        api_key=config.api_key,
-        provider=ProviderEnum(config.provider),
-        **config.get("provider_kwargs", {}),
-    )
 
-    requests = load_requests(config)
-    process(requests=requests, client=client, config=config)
+    for model_cfg in config.models:
+        provider_str = model_cfg["provider"]
+        model_name = model_cfg["model"]
+        api_key = model_cfg.get("api_key", "")
 
+        provider_kwargs = dict(model_cfg.get("provider_kwargs", {}))
+        if provider_str == "vllm":
+            provider_kwargs["model"] = model_name
+
+        with open_dict(config):
+            config.provider = provider_str
+            config.model = model_name
+            config.api_key = api_key
+
+        logger.info(f"<bold>🔎 Running evaluation: {provider_str}:{model_name} 🔎</bold>")
+
+        client = Provider(
+            api_key=config.api_key,
+            provider=ProviderEnum(config.provider),
+            **provider_kwargs,
+        )
+
+        requests = load_requests(config)
+        process(requests=requests, client=client, config=config)
+
+        # ---- free GPU memory ----
+        if provider_str == "vllm":
+            del client.provider.llm
+            gc.collect()
+            torch.cuda.empty_cache()
+            logger.info(f"Cleared GPU memory for model {model_name}")
 
 if __name__ == "__main__":
     run()
